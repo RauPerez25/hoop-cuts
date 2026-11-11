@@ -1,37 +1,28 @@
 name: Publicar instalador
-# Cuando cambia el instalador, lo construye y lo publica como «release» (vX.Y.Z de version_instalador.txt).
+# Publica dist/Instalar-Hoop-Cuts.exe como «release» vX.Y.Z (instalador/version_instalador.txt).
+# El .exe se construye con instalador/construir.sh (necesita NSIS) y se sube a dist/.
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [instalador/**]
+    paths: [dist/**, instalador/version_instalador.txt]
 permissions:
   contents: write
 jobs:
   publicar:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Instalar NSIS
-        run: |
-          for i in 1 2 3 4; do
-            timeout 180 sudo apt-get update -q -o Acquire::Retries=3 > /dev/null || true
-            timeout 180 sudo apt-get install -y -q -o Acquire::Retries=3 nsis > /dev/null && break
-            sleep 30
-          done
-          which makensis
-      - run: python3 -m py_compile instalador/arranque.py
-      - run: bash instalador/construir.sh salida
       - name: Publicar
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER=$(cat instalador/version_instalador.txt)
-          cp "salida/Instalar Hoop Cuts.exe" salida/Instalar-Hoop-Cuts.exe
+          sha256sum dist/Instalar-Hoop-Cuts.exe
           if gh release view "v$VER" > /dev/null 2>&1; then
-            echo "La versión v$VER ya está publicada: sube version_instalador.txt para publicar otra."
+            gh release upload "v$VER" dist/Instalar-Hoop-Cuts.exe --clobber
           else
-            gh release create "v$VER" salida/Instalar-Hoop-Cuts.exe --title "Hoop Cuts $VER" \
+            gh release create "v$VER" dist/Instalar-Hoop-Cuts.exe --title "Hoop Cuts $VER" \
               --notes "Instalador de Hoop Cuts para Windows. Necesitas una clave de licencia."
           fi
