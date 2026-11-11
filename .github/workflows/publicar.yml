@@ -1,0 +1,29 @@
+name: Publicar instalador
+# Cuando cambia el instalador, lo construye y lo publica como «release» (vX.Y.Z de version_instalador.txt).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [instalador/**]
+permissions:
+  contents: write
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y -q nsis > /dev/null
+      - run: python3 -m py_compile instalador/arranque.py
+      - run: bash instalador/construir.sh salida
+      - name: Publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(cat instalador/version_instalador.txt)
+          cp "salida/Instalar Hoop Cuts.exe" salida/Instalar-Hoop-Cuts.exe
+          if gh release view "v$VER" > /dev/null 2>&1; then
+            echo "La versión v$VER ya está publicada: sube version_instalador.txt para publicar otra."
+          else
+            gh release create "v$VER" salida/Instalar-Hoop-Cuts.exe --title "Hoop Cuts $VER" \
+              --notes "Instalador de Hoop Cuts para Windows. Necesitas una clave de licencia."
+          fi
