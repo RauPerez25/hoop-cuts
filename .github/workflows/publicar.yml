@@ -9,11 +9,14 @@ permissions:
   contents: write
 jobs:
   publicar:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest   # ya trae NSIS instalado
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
-      - run: for i in 1 2 3; do sudo apt-get update -q > /dev/null && sudo apt-get install -y -q nsis > /dev/null && break; sleep 20; done; which makensis
-      - run: python3 -m py_compile instalador/arranque.py
+      - run: ls "/c/Program Files (x86)/NSIS/makensis.exe"
+      - run: python -m py_compile instalador/arranque.py
       - run: bash instalador/construir.sh salida
       - name: Publicar
         env:
