@@ -1,6 +1,6 @@
 name: Publicar instalador
-# Publica dist/Instalar-Hoop-Cuts.exe como «release» vX.Y.Z (instalador/version_instalador.txt).
-# El .exe se construye con instalador/construir.sh (necesita NSIS) y se sube a dist/.
+# Publica dist/Instalar-Hoop-Cuts.exe y dist/Hoop-Cuts-Mac.zip como «release» vX.Y.Z (instalador/version_instalador.txt).
+# Se construyen con instalador/construir.sh (Windows, necesita NSIS) y construir_mac.sh, y se suben a dist/.
 on:
   workflow_dispatch:
   push:
@@ -19,10 +19,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VER=$(cat instalador/version_instalador.txt)
-          sha256sum dist/Instalar-Hoop-Cuts.exe
+          sha256sum dist/Instalar-Hoop-Cuts.exe dist/Hoop-Cuts-Mac.zip
           if gh release view "v$VER" > /dev/null 2>&1; then
-            gh release upload "v$VER" dist/Instalar-Hoop-Cuts.exe --clobber
+            gh release upload "v$VER" dist/Instalar-Hoop-Cuts.exe dist/Hoop-Cuts-Mac.zip --clobber
           else
-            gh release create "v$VER" dist/Instalar-Hoop-Cuts.exe --title "Hoop Cuts $VER" \
-              --notes "Instalador de Hoop Cuts para Windows. Necesitas una clave de licencia."
+            gh release create "v$VER" dist/Instalar-Hoop-Cuts.exe dist/Hoop-Cuts-Mac.zip --title "Hoop Cuts $VER" \
+              --notes "Instaladores de Hoop Cuts para Windows y Mac (chip de Apple). Necesitas una clave de licencia."
           fi

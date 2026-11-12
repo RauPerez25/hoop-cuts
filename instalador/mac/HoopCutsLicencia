@@ -1,0 +1,56 @@
+#!/bin/bash
+# Arranque de «Hoop Cuts» en Mac (versión con licencia).
+# La primera vez descarga Python, las librerías y ffmpeg en ~/Library/Application Support/HoopCuts
+# (no hace falta ser administrador). Luego abre el primer arranque (arranque.py), que pide la clave
+# y descarga el programa compilado para este Mac. A partir de ahí se abre la app normal.
+RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
+D="$HOME/Library/Application Support/HoopCuts"
+LOG="$D/instalacion.log"
+VER="$(cat "$RES/version.txt")"
+mkdir -p "$D/app"
+
+aviso() { osascript -e "display notification \"$1\" with title \"Hoop Cuts\"" >/dev/null 2>&1; }
+error() {
+  osascript -e "display dialog \"$1\n\nDetalles en: $LOG\" buttons {\"Vale\"} default button 1 with icon stop with title \"Hoop Cuts\"" >/dev/null 2>&1
+  exit 1
+}
+
+if [ "$(uname -m)" != "arm64" ]; then
+  osascript -e 'display dialog "Hoop Cuts necesita un Mac con chip de Apple (M1 o posterior). Este Mac tiene procesador Intel y todavía no hay versión para él." buttons {"Vale"} default button 1 with icon stop with title "Hoop Cuts"' >/dev/null 2>&1
+  exit 1
+fi
+
+instalar() {
+  export UV_PYTHON_INSTALL_DIR="$D/python" UV_CACHE_DIR="$D/cache" UV_PYTHON_PREFERENCE=only-managed UV_NO_PROGRESS=1
+  if [ ! -x "$D/uv" ]; then
+    curl -L --fail --retry 3 -o "$D/uv.tar.gz" "https://github.com/astral-sh/uv/releases/download/0.9.5/uv-aarch64-apple-darwin.tar.gz" || return 1
+    tar -xzf "$D/uv.tar.gz" -C "$D" --strip-components 1 || return 1
+    rm -f "$D/uv.tar.gz" "$D/uvx"
+  fi
+  "$D/uv" python install 3.11 || return 2
+  "$D/uv" venv --python 3.11 --allow-existing "$D/venv" || return 3
+  "$D/uv" pip install --python "$D/venv/bin/python" numpy "opencv-python~=4.10" rapidocr-onnxruntime pywebview static-ffmpeg || return 4
+  if ! { command -v ffmpeg && command -v ffprobe; } >/dev/null 2>&1; then
+    "$D/venv/bin/python" -c "from static_ffmpeg import run; print(run.get_or_fetch_platform_executables_else_raise())" || return 5
+  fi
+  rm -rf "$D/cache"
+  "$D/venv/bin/python" -c "import cv2, numpy, rapidocr_onnxruntime, webview, tkinter; print('Todo listo')" || return 6
+}
+
+if [ "$(cat "$D/instalador.txt" 2>/dev/null)" != "$VER" ] || [ ! -x "$D/venv/bin/python" ]; then
+  osascript -e 'display dialog "Es la primera vez: voy a descargar lo que necesita la app (unos 500 MB). Tarda entre 5 y 15 minutos. Te aviso cuando termine." buttons {"Empezar"} default button 1 with title "Hoop Cuts"' >/dev/null 2>&1 || exit 0
+  aviso "Instalando... puede tardar unos minutos"
+  ( instalar ) >"$LOG" 2>&1 || error "No se pudo terminar la instalación. Comprueba que hay internet y vuelve a abrir la app."
+  echo "$VER" > "$D/instalador.txt"
+  aviso "Listo. Ahora escribe tu clave de licencia."
+fi
+
+# Si el programa todavía no está descargado (no hay ventana compilada), pone el primer arranque.
+# Si ya está, no se toca nada: se actualiza solo desde el servidor de licencias.
+if ! ls "$D/app/"ventana.*.so >/dev/null 2>&1; then
+  cp -f "$RES/arranque.py" "$D/app/ventana.py"
+  [ -f "$D/app/version.txt" ] || echo 0 > "$D/app/version.txt"
+fi
+
+cd "$D/app"
+exec "$D/venv/bin/python" "$D/app/ventana.py"
